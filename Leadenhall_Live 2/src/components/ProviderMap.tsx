@@ -11,26 +11,20 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
 
-const amberIcon = new L.DivIcon({
-  className: '',
-  html: `<div style="width:14px;height:14px;background:#fbbf24;border-radius:50%;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.5)"></div>`,
-  iconSize: [14, 14],
-  iconAnchor: [7, 7],
-});
+function pin(color: string, size: number, glow = false) {
+  return new L.DivIcon({
+    className: '',
+    html: `<div style="width:${size}px;height:${size}px;background:${color};border-radius:50%;border:3px solid #fff;box-shadow:${
+      glow ? `0 0 0 6px ${color}33, 0 2px 8px rgba(60,42,26,0.35)` : '0 2px 6px rgba(60,42,26,0.35)'
+    }"></div>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+  });
+}
 
-const amberIconHighlighted = new L.DivIcon({
-  className: '',
-  html: `<div style="width:20px;height:20px;background:#f59e0b;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 8px rgba(251,191,36,0.6)"></div>`,
-  iconSize: [20, 20],
-  iconAnchor: [10, 10],
-});
-
-const blueIcon = new L.DivIcon({
-  className: '',
-  html: `<div style="width:14px;height:14px;background:#3b82f6;border-radius:50%;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.5)"></div>`,
-  iconSize: [14, 14],
-  iconAnchor: [7, 7],
-});
+const clayIcon = pin('#C0532B', 16);
+const clayIconHighlighted = pin('#C0532B', 22, true);
+const agaveIcon = pin('#2E6A52', 16, true);
 
 interface ProviderPin {
   id: string;
@@ -66,7 +60,7 @@ export default function ProviderMap({ providers, userLocation, highlightedId, on
     ? [stored.lat, stored.lng]
     : providers.length > 0
     ? [providers[0].lat, providers[0].lng]
-    : [54.0, -2.0];
+    : [53.4084, -2.9916];
 
   const centre: [number, number] = resolvedLocation;
 
@@ -78,15 +72,15 @@ export default function ProviderMap({ providers, userLocation, highlightedId, on
     : resolvedLocation;
 
   return (
-    <div style={{ height }} className="rounded-xl overflow-hidden border border-zinc-800">
+    <div style={{ height }} className="rounded-3xl overflow-hidden border border-line shadow-soft">
       <MapContainer
         center={centre}
         zoom={12}
-        style={{ height: '100%', width: '100%', background: '#18181b' }}
+        style={{ height: '100%', width: '100%', background: '#F5EEE2' }}
         attributionControl={false}
       >
         <TileLayer
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
           attribution="&copy; OpenStreetMap &copy; CARTO"
         />
         {highlighted && <FlyTo lat={highlighted.lat} lng={highlighted.lng} />}
@@ -94,24 +88,24 @@ export default function ProviderMap({ providers, userLocation, highlightedId, on
           <Circle
             center={radiusCentre}
             radius={radiusKm * 1000}
-            pathOptions={{ color: '#fbbf24', fillColor: '#fbbf24', fillOpacity: 0.05, weight: 1.5, dashArray: '6 4' }}
+            pathOptions={{ color: '#C0532B', fillColor: '#C0532B', fillOpacity: 0.06, weight: 1.5, dashArray: '6 4' }}
           />
         )}
         {userLocation && (
-          <Marker position={[userLocation.lat, userLocation.lng]} icon={blueIcon}>
-            <Popup>You</Popup>
+          <Marker position={[userLocation.lat, userLocation.lng]} icon={agaveIcon}>
+            <Popup>You are here</Popup>
           </Marker>
         )}
         {providers.map((p) => (
           <Marker
             key={p.id}
             position={[p.lat, p.lng]}
-            icon={p.id === highlightedId ? amberIconHighlighted : amberIcon}
+            icon={p.id === highlightedId ? clayIconHighlighted : clayIcon}
             eventHandlers={{ click: () => onMarkerClick?.(p.id) }}
           >
             <Popup>
               <div style={{ fontWeight: 600 }}>{p.name}</div>
-              <div style={{ fontSize: '0.75rem', color: '#a1a1aa' }}>£{p.price_from} · ★ {Number(p.rating).toFixed(1)}</div>
+              <div style={{ fontSize: '0.75rem', color: '#6B5D4F' }}>from £{p.price_from} · ★ {Number(p.rating).toFixed(1)}</div>
             </Popup>
           </Marker>
         ))}

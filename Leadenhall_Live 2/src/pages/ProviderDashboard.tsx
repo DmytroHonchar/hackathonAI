@@ -5,21 +5,22 @@ import { useProviderContext } from '../context/ProviderContext';
 import { supabase } from '../lib/supabase';
 import ListingEditor from '../components/provider/ListingEditor';
 import IncomingBookings from '../components/provider/IncomingBookings';
-import { LayoutDashboard, FileEdit, Radio, CalendarDays, Loader, Zap } from 'lucide-react';
+import { Store, FileEdit, Radio, CalendarDays, Loader, Eye } from 'lucide-react';
+import { categoryMeta } from '../lib/categories';
 
 type Tab = 'listing' | 'availability' | 'bookings';
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
-  { id: 'listing',      label: 'My Listing',        icon: FileEdit },
-  { id: 'availability', label: 'Availability',       icon: Radio },
-  { id: 'bookings',     label: 'Incoming Bookings',  icon: CalendarDays },
+  { id: 'bookings',     label: 'Bookings',   icon: CalendarDays },
+  { id: 'listing',      label: 'My listing', icon: FileEdit },
+  { id: 'availability', label: 'Availability', icon: Radio },
 ];
 
 export default function ProviderDashboard() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { listing, isLoading, reload } = useProviderContext();
-  const [activeTab, setActiveTab] = useState<Tab>('listing');
+  const [activeTab, setActiveTab] = useState<Tab>('bookings');
   const [toggling, setToggling] = useState<'available' | 'emergency' | null>(null);
 
   useEffect(() => {
@@ -36,107 +37,94 @@ export default function ProviderDashboard() {
 
   if (authLoading || isLoading) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-amber-400/30 border-t-amber-400 rounded-full animate-spin" />
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-8 h-8 border-[3px] border-agave/25 border-t-agave rounded-full animate-spin" />
       </div>
     );
   }
 
   if (!listing) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-        <div className="text-center max-w-sm mx-auto px-4">
-          <div className="w-16 h-16 bg-zinc-900 border border-zinc-800 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <LayoutDashboard size={28} className="text-zinc-600" />
-          </div>
-          <h2 className="text-white font-bold text-lg mb-2">Not a provider yet</h2>
-          <p className="text-zinc-500 text-sm mb-6">Create your listing to start receiving bookings from customers and the AI dispatcher.</p>
-          <Link
-            to="/settings"
-            className="inline-flex items-center gap-2 bg-amber-400 hover:bg-amber-300 text-zinc-950 font-semibold text-sm px-5 py-2.5 rounded-xl transition-colors"
-          >
-            Become a provider
-          </Link>
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <div className="card rounded-4xl p-8 text-center max-w-sm">
+          <div className="w-16 h-16 bg-agave-tint rounded-3xl grid place-items-center mx-auto mb-4"><Store size={28} className="text-agave-dark" /></div>
+          <h2 className="font-display text-2xl font-semibold text-ink mb-2">Start earning on Manos</h2>
+          <p className="text-ink-soft text-sm mb-6">Create your listing to receive bookings from customers and the AI assistant.</p>
+          <Link to="/settings" className="btn-agave px-5 py-3 text-sm">List my business</Link>
         </div>
       </div>
     );
   }
 
+  const cat = categoryMeta(listing.category);
+  const CatIcon = cat.icon;
+
   return (
-    <div className="min-h-screen bg-zinc-950">
+    <div className="min-h-screen">
       <div className="max-w-3xl mx-auto px-4 py-8">
         {/* Header */}
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 bg-amber-400/10 rounded-xl flex items-center justify-center">
-            <Zap size={18} className="text-amber-400 fill-amber-400" />
+        <div className="card rounded-4xl p-5 mb-5 flex items-center gap-4">
+          <div className="relative flex-shrink-0">
+            <img src={listing.photo_url ?? `https://i.pravatar.cc/160?u=${listing.id}`} alt="" className="w-14 h-14 rounded-2xl object-cover bg-sand" />
+            <span className={`absolute -bottom-1.5 -right-1.5 w-7 h-7 rounded-full grid place-items-center ring-2 ring-surface ${cat.tintBg}`}><CatIcon size={13} className={cat.tintText} /></span>
           </div>
-          <div>
-            <h1 className="text-white text-xl font-bold">{listing.name}</h1>
-            <p className="text-zinc-500 text-sm capitalize">{listing.category} · {listing.available ? 'Live' : 'Paused'}</p>
+          <div className="flex-1 min-w-0">
+            <h1 className="font-display text-xl font-semibold text-ink truncate">{listing.name}</h1>
+            <p className={`text-sm font-semibold ${cat.tintText}`}>{cat.label}</p>
           </div>
-          <div className={`ml-auto flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border ${
-            listing.available
-              ? 'bg-emerald-900/30 text-emerald-400 border-emerald-900/40'
-              : 'bg-zinc-800 text-zinc-500 border-zinc-700'
-          }`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${listing.available ? 'bg-emerald-400' : 'bg-zinc-600'}`} />
-            {listing.available ? 'Live' : 'Paused'}
+          <div className="flex flex-col items-end gap-2">
+            <span className={`chip ${listing.available ? 'bg-agave-tint text-agave-dark' : 'bg-sand text-ink-faint'}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${listing.available ? 'bg-agave' : 'bg-ink-faint'}`} />
+              {listing.available ? 'Live' : 'Paused'}
+            </span>
+            <Link to={`/provider/${listing.id}`} className="text-xs font-semibold text-ink-soft hover:text-clay flex items-center gap-1"><Eye size={13} /> View public</Link>
           </div>
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 bg-zinc-900 border border-zinc-800 rounded-2xl p-1 mb-6">
+        <div className="flex gap-1 bg-sand rounded-full p-1 mb-6">
           {TABS.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               onClick={() => setActiveTab(id)}
-              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all ${
-                activeTab === id
-                  ? 'bg-zinc-800 text-white shadow-sm'
-                  : 'text-zinc-500 hover:text-zinc-300'
+              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-full text-sm font-semibold transition-all ${
+                activeTab === id ? 'bg-surface text-ink shadow-soft' : 'text-ink-soft hover:text-ink'
               }`}
             >
-              <Icon size={14} />
+              <Icon size={15} />
               <span className="hidden sm:inline">{label}</span>
             </button>
           ))}
         </div>
 
-        {/* Tab: My Listing */}
-        {activeTab === 'listing' && (
-          <ListingEditor listing={listing} onSaved={reload} />
-        )}
+        {activeTab === 'listing' && <ListingEditor listing={listing} onSaved={reload} />}
 
-        {/* Tab: Availability */}
         {activeTab === 'availability' && (
           <div className="space-y-4">
             <ToggleCard
               title="Listing live"
-              description="When on, your listing appears in Browse, search results, and is discoverable by the AI dispatcher. Turn off to pause without deleting."
+              description="When on, your listing appears in Explore, search and AI results. Turn off to pause without deleting."
               value={listing.available}
               disabled={toggling === 'available'}
               onChange={(v) => setFlag('available', v)}
               activeLabel="Live — customers can find and book you"
-              inactiveLabel="Paused — hidden from all search and AI results"
-              activeColor="emerald"
+              inactiveLabel="Paused — hidden from all results"
+              activeColor="agave"
             />
             <ToggleCard
               title="Emergency / 24-hour service"
-              description="Marks your listing as available for urgent call-outs. Customers filtering by emergency will see you first."
+              description="Available for urgent call-outs. Customers filtering by emergency see you first."
               value={listing.emergency}
               disabled={toggling === 'emergency'}
               onChange={(v) => setFlag('emergency', v)}
               activeLabel="Emergency calls accepted"
               inactiveLabel="Standard hours only"
-              activeColor="amber"
+              activeColor="coral"
             />
           </div>
         )}
 
-        {/* Tab: Incoming Bookings */}
-        {activeTab === 'bookings' && (
-          <IncomingBookings listingId={listing.id} />
-        )}
+        {activeTab === 'bookings' && <IncomingBookings listingId={listing.id} />}
       </div>
     </div>
   );
@@ -152,25 +140,24 @@ function ToggleCard({
   onChange: (v: boolean) => void;
   activeLabel: string;
   inactiveLabel: string;
-  activeColor: 'emerald' | 'amber';
+  activeColor: 'agave' | 'coral';
 }) {
-  const track = activeColor === 'emerald' ? 'bg-emerald-500' : 'bg-amber-400';
+  const track = value ? (activeColor === 'agave' ? 'bg-agave' : 'bg-coral') : 'bg-line-strong';
+  const label = value ? (activeColor === 'agave' ? 'text-agave-dark' : 'text-coral') : 'text-ink-faint';
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+    <div className="card rounded-4xl p-5">
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1">
-          <h3 className="text-white font-semibold mb-1">{title}</h3>
-          <p className="text-zinc-500 text-sm">{description}</p>
-          <p className={`mt-3 text-sm font-medium ${value ? (activeColor === 'emerald' ? 'text-emerald-400' : 'text-amber-400') : 'text-zinc-500'}`}>
-            {value ? activeLabel : inactiveLabel}
-          </p>
+          <h3 className="font-display text-lg font-semibold text-ink mb-1">{title}</h3>
+          <p className="text-ink-soft text-sm">{description}</p>
+          <p className={`mt-3 text-sm font-semibold ${label}`}>{value ? activeLabel : inactiveLabel}</p>
         </div>
         <button
           onClick={() => onChange(!value)}
           disabled={disabled}
-          className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors flex-shrink-0 mt-0.5 disabled:opacity-60 ${value ? track : 'bg-zinc-700'}`}
+          className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors flex-shrink-0 mt-0.5 disabled:opacity-60 ${track}`}
         >
-          {disabled && <Loader size={10} className="absolute left-1/2 -translate-x-1/2 text-white animate-spin" />}
+          {disabled && <Loader size={11} className="absolute left-1/2 -translate-x-1/2 text-white animate-spin" />}
           <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${value ? 'translate-x-8' : 'translate-x-1'} ${disabled ? 'opacity-0' : ''}`} />
         </button>
       </div>

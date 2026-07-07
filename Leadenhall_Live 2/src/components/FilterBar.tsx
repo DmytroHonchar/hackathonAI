@@ -1,3 +1,6 @@
+import { Zap, SlidersHorizontal } from 'lucide-react';
+import { CATEGORIES } from '../lib/categories';
+
 interface FilterBarProps {
   category: string;
   setCategory: (v: string) => void;
@@ -16,62 +19,75 @@ export default function FilterBar({
   maxDistance, setMaxDistance,
 }: FilterBarProps) {
   return (
-    <div className="flex flex-wrap gap-4 items-end p-4 bg-zinc-900 border border-zinc-800 rounded-2xl">
-      <div className="flex flex-col gap-1.5">
-        <label className="text-xs text-zinc-400 font-medium">Category</label>
-        <select
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          className="bg-zinc-800 border border-zinc-700 text-white text-sm rounded-xl px-3 py-2 focus:outline-none focus:border-amber-400 min-w-[140px]"
+    <div className="space-y-3">
+      {/* Category pills */}
+      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+        <button
+          onClick={() => setCategory('')}
+          className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-semibold border transition-all ${
+            category === '' ? 'bg-ink text-canvas border-ink' : 'bg-surface text-ink-soft border-line hover:border-line-strong'
+          }`}
         >
-          <option value="">All categories</option>
-          <option value="plumber">Plumber</option>
-          <option value="electrician">Electrician</option>
-          <option value="cleaner">Cleaner</option>
-        </select>
+          All
+        </button>
+        {CATEGORIES.map((c) => {
+          const Icon = c.icon;
+          const active = category === c.id;
+          return (
+            <button
+              key={c.id}
+              onClick={() => setCategory(active ? '' : c.id)}
+              className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold border transition-all ${
+                active ? 'bg-clay text-white border-clay shadow-clay' : 'bg-surface text-ink-soft border-line hover:border-line-strong'
+              }`}
+            >
+              <Icon size={15} className={active ? '' : c.tintText} />
+              {c.plural}
+            </button>
+          );
+        })}
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <label className="text-xs text-zinc-400 font-medium">Max price (£)</label>
-        <div className="flex items-center gap-2">
+      {/* Secondary filters */}
+      <div className="flex flex-wrap items-center gap-2.5">
+        <span className="hidden sm:flex items-center gap-1.5 text-ink-faint text-xs font-semibold">
+          <SlidersHorizontal size={13} /> Filters
+        </span>
+
+        <label className="flex items-center gap-2 bg-surface border border-line rounded-full pl-3.5 pr-2 py-1.5">
+          <span className="text-xs font-medium text-ink-soft">Under £</span>
           <input
             type="number"
             min={0}
             value={maxPrice || ''}
             onChange={(e) => setMaxPrice(Number(e.target.value) || 0)}
             placeholder="Any"
-            className="bg-zinc-800 border border-zinc-700 text-white text-sm rounded-xl px-3 py-2 focus:outline-none focus:border-amber-400 w-24"
+            className="w-16 bg-transparent text-ink text-sm font-semibold focus:outline-none placeholder:text-ink-faint placeholder:font-normal"
           />
-          {maxPrice > 0 && <span className="text-zinc-500 text-xs">£{maxPrice}</span>}
-          {!maxPrice && <span className="text-zinc-500 text-xs">No limit</span>}
-        </div>
-      </div>
+        </label>
 
-      <div className="flex flex-col gap-1.5">
-        <label className="text-xs text-zinc-400 font-medium">Max distance (km)</label>
-        <div className="flex items-center gap-2">
+        <label className="flex items-center gap-2 bg-surface border border-line rounded-full pl-3.5 pr-2 py-1.5">
+          <span className="text-xs font-medium text-ink-soft">Within km</span>
           <input
             type="number"
             min={0}
             value={maxDistance || ''}
             onChange={(e) => setMaxDistance(Number(e.target.value) || 0)}
             placeholder="Any"
-            className="bg-zinc-800 border border-zinc-700 text-white text-sm rounded-xl px-3 py-2 focus:outline-none focus:border-amber-400 w-24"
+            className="w-14 bg-transparent text-ink text-sm font-semibold focus:outline-none placeholder:text-ink-faint placeholder:font-normal"
           />
-          {maxDistance > 0 && <span className="text-zinc-500 text-xs">{maxDistance} km</span>}
-          {!maxDistance && <span className="text-zinc-500 text-xs">No limit</span>}
-        </div>
-      </div>
+        </label>
 
-      <label className="flex items-center gap-2 cursor-pointer select-none">
-        <div
+        <button
           onClick={() => setEmergencyOnly(!emergencyOnly)}
-          className={`w-10 h-5 rounded-full transition-colors flex items-center px-0.5 ${emergencyOnly ? 'bg-amber-400' : 'bg-zinc-700'}`}
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold border transition-all ${
+            emergencyOnly ? 'bg-coral text-white border-coral' : 'bg-surface text-ink-soft border-line hover:border-line-strong'
+          }`}
         >
-          <div className={`w-4 h-4 bg-white rounded-full shadow transition-transform ${emergencyOnly ? 'translate-x-5' : 'translate-x-0'}`} />
-        </div>
-        <span className="text-sm text-zinc-300">Emergency only</span>
-      </label>
+          <Zap size={14} className={emergencyOnly ? '' : 'text-coral'} />
+          24h / Emergency
+        </button>
+      </div>
     </div>
   );
 }

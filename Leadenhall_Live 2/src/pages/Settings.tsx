@@ -3,7 +3,8 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useProviderContext } from '../context/ProviderContext';
 import { supabase } from '../lib/supabase';
-import { Briefcase, ArrowRight, Loader, User, MapPin, Search } from 'lucide-react';
+import { Store, ArrowRight, Loader, User, MapPin, Search, LogOut, CheckCircle2, Locate } from 'lucide-react';
+import Logo from '../components/Logo';
 
 export default function Settings() {
   const { user } = useAuth();
@@ -12,7 +13,6 @@ export default function Settings() {
   const [becoming, setBecoming] = useState(false);
   const [error, setError] = useState('');
 
-  // Location state
   const stored = JSON.parse(localStorage.getItem('user_location') || 'null');
   const [locationLabel, setLocationLabel] = useState(stored?.label || '');
   const [locationQuery, setLocationQuery] = useState(stored?.label || '');
@@ -33,7 +33,7 @@ export default function Settings() {
       try {
         const res = await fetch(
           `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(value)}&format=json&limit=5&addressdetails=1`,
-          { headers: { 'User-Agent': 'DispatchApp/1.0' } }
+          { headers: { 'User-Agent': 'ManosApp/1.0' } }
         );
         if (!res.ok) return;
         const data = await res.json();
@@ -73,12 +73,10 @@ export default function Settings() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <p className="text-zinc-400 mb-4">Sign in to access settings.</p>
-          <Link to="/login" className="bg-amber-400 text-zinc-950 font-semibold px-5 py-2.5 rounded-xl text-sm">
-            Sign in
-          </Link>
+          <p className="text-ink-soft mb-4">Sign in to access your account.</p>
+          <Link to="/login" className="btn-clay px-5 py-2.5 text-sm">Sign in</Link>
         </div>
       </div>
     );
@@ -94,7 +92,7 @@ export default function Settings() {
 
     const stored = JSON.parse(localStorage.getItem('user_location') || 'null');
     if (!stored?.lat || !stored?.lng) {
-      setError('Please set your location in settings before becoming a provider.');
+      setError('Please set your location above before listing your business.');
       setBecoming(false);
       return;
     }
@@ -117,66 +115,59 @@ export default function Settings() {
       setBecoming(false);
       return;
     }
-
     await reload();
     navigate('/provider');
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950">
+    <div className="min-h-screen">
       <div className="max-w-2xl mx-auto px-4 py-8">
-        <h1 className="text-white text-2xl font-bold mb-8">Settings</h1>
+        <h1 className="font-display text-3xl font-semibold text-ink mb-6">Account</h1>
 
         {/* Account */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 mb-4">
-          <div className="flex items-center gap-3 mb-1">
-            <div className="w-9 h-9 bg-zinc-800 rounded-xl flex items-center justify-center">
-              <User size={16} className="text-zinc-400" />
-            </div>
-            <div>
-              <p className="text-white font-medium text-sm">{user.email}</p>
-              <p className="text-zinc-600 text-xs">Customer account</p>
-            </div>
+        <div className="card rounded-4xl p-5 mb-4 flex items-center gap-3">
+          <div className="w-12 h-12 bg-clay-tint rounded-2xl grid place-items-center flex-shrink-0"><User size={20} className="text-clay" /></div>
+          <div className="flex-1 min-w-0">
+            <p className="text-ink font-semibold text-sm truncate">{user.email}</p>
+            <p className="text-ink-faint text-xs">{listing ? 'Customer + Provider' : 'Customer account'}</p>
           </div>
+          <button onClick={() => supabase.auth.signOut()} className="btn-ghost px-4 py-2 text-sm hover:text-coral hover:border-coral/30">
+            <LogOut size={15} /> <span className="hidden sm:inline">Sign out</span>
+          </button>
         </div>
 
         {/* Location */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 mb-4">
+        <div className="card rounded-4xl p-5 mb-4">
           <div className="flex items-start gap-3 mb-4">
-            <div className="w-9 h-9 bg-amber-400/10 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5">
-              <MapPin size={16} className="text-amber-400" />
-            </div>
+            <div className="w-11 h-11 bg-agave-tint rounded-2xl grid place-items-center flex-shrink-0"><MapPin size={19} className="text-agave-dark" /></div>
             <div>
-              <h2 className="text-white font-semibold">Your Location</h2>
-              <p className="text-zinc-500 text-sm mt-0.5">
-                Set your location so we can show you nearby providers and calculate distances.
-              </p>
+              <h2 className="font-display text-lg font-semibold text-ink">Your location</h2>
+              <p className="text-ink-soft text-sm mt-0.5">So we can show pros who are truly nearby and get distances right.</p>
             </div>
           </div>
 
           <div className="relative mb-3">
-            <div className="flex items-center gap-2 bg-zinc-800 border border-zinc-700 focus-within:border-amber-400/60 rounded-xl px-3 py-2.5 transition-colors">
-              <Search size={13} className="text-zinc-500 flex-shrink-0" />
+            <div className="flex items-center gap-2 field !py-3">
+              <Search size={15} className="text-ink-faint flex-shrink-0" />
               <input
                 value={locationQuery}
                 onChange={(e) => handleLocationInput(e.target.value)}
                 onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
                 onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-                placeholder="Search your address, city or postcode…"
-                className="bg-transparent text-white text-sm placeholder:text-zinc-600 focus:outline-none flex-1 min-w-0"
+                placeholder="Search address, city or postcode…"
+                className="bg-transparent text-ink text-sm placeholder:text-ink-faint focus:outline-none flex-1 min-w-0"
               />
             </div>
-
             {showSuggestions && suggestions.length > 0 && (
-              <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-zinc-800 border border-zinc-700 rounded-xl overflow-hidden shadow-xl">
+              <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-surface border border-line rounded-2xl overflow-hidden shadow-lift">
                 {suggestions.map((s, i) => (
                   <button
                     key={i}
                     type="button"
                     onMouseDown={() => selectLocation(s)}
-                    className="w-full text-left px-3 py-2.5 text-sm text-zinc-300 hover:bg-zinc-700 hover:text-white transition-colors border-b border-zinc-700/50 last:border-b-0 flex items-start gap-2"
+                    className="w-full text-left px-3 py-2.5 text-sm text-ink-soft hover:bg-sand hover:text-ink transition-colors border-b border-line last:border-b-0 flex items-start gap-2"
                   >
-                    <MapPin size={12} className="text-zinc-500 mt-0.5 flex-shrink-0" />
+                    <MapPin size={12} className="text-ink-faint mt-0.5 flex-shrink-0" />
                     <span className="line-clamp-2">{s.display_name}</span>
                   </button>
                 ))}
@@ -185,66 +176,51 @@ export default function Settings() {
           </div>
 
           <div className="flex items-center gap-3">
-            <button
-              onClick={useCurrentLocation}
-              className="flex items-center gap-1.5 text-sm text-zinc-400 hover:text-white transition-colors"
-            >
-              <MapPin size={13} />
-              Use my current location
+            <button onClick={useCurrentLocation} className="flex items-center gap-1.5 text-sm font-semibold text-agave-dark hover:text-agave transition-colors">
+              <Locate size={15} /> Use my current location
             </button>
-            {locationSaved && <span className="text-emerald-400 text-xs font-medium">✓ Saved</span>}
+            {locationSaved && <span className="text-agave text-xs font-semibold flex items-center gap-1"><CheckCircle2 size={13} /> Saved</span>}
           </div>
 
           {locationLabel && (
-            <p className="text-zinc-400 text-xs mt-3">
-              Current: <span className="text-white font-medium">{locationLabel}</span>
+            <p className="text-ink-soft text-xs mt-3 bg-sand rounded-xl px-3 py-2">
+              Current: <span className="text-ink font-semibold">{locationLabel}</span>
             </p>
           )}
         </div>
 
-        {/* Provider toggle */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
-          <div className="flex items-start gap-3 mb-4">
-            <div className="w-9 h-9 bg-amber-400/10 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5">
-              <Briefcase size={16} className="text-amber-400" />
-            </div>
+        {/* Provider */}
+        <div className="card rounded-4xl p-5 overflow-hidden relative">
+          {!listing && <div className="absolute inset-0 bg-gradient-to-br from-agave-tint/60 to-transparent pointer-events-none" />}
+          <div className="relative flex items-start gap-3 mb-4">
+            <div className="w-11 h-11 bg-agave rounded-2xl grid place-items-center flex-shrink-0 shadow-agave"><Store size={19} className="text-white" /></div>
             <div>
-              <h2 className="text-white font-semibold">Service Provider</h2>
-              <p className="text-zinc-500 text-sm mt-0.5">
-                List your business on Dispatch, set your availability, and receive bookings directly from customers and the AI dispatcher.
-              </p>
+              <h2 className="font-display text-lg font-semibold text-ink">Offer your services</h2>
+              <p className="text-ink-soft text-sm mt-0.5">List your trade on Manos, set your hours, and get booked by customers and the assistant.</p>
             </div>
           </div>
 
           {isLoading ? (
-            <div className="flex items-center gap-2 text-zinc-500 text-sm">
-              <Loader size={14} className="animate-spin" />
-              Checking status…
-            </div>
+            <div className="relative flex items-center gap-2 text-ink-faint text-sm"><Loader size={14} className="animate-spin" /> Checking…</div>
           ) : listing ? (
-            <div className="flex items-center gap-3">
-              <div className="w-2 h-2 bg-emerald-400 rounded-full" />
-              <span className="text-zinc-300 text-sm">You have an active listing — <strong className="text-white">{listing.name}</strong></span>
-              <button
-                onClick={() => navigate('/provider')}
-                className="ml-auto flex items-center gap-1.5 bg-amber-400 hover:bg-amber-300 text-zinc-950 font-semibold text-sm px-4 py-2 rounded-xl transition-colors"
-              >
-                Dashboard <ArrowRight size={14} />
+            <div className="relative flex items-center gap-3 flex-wrap">
+              <span className="w-2 h-2 bg-agave rounded-full" />
+              <span className="text-ink-soft text-sm">Active listing — <strong className="text-ink">{listing.name}</strong></span>
+              <button onClick={() => navigate('/provider')} className="btn-agave ml-auto px-4 py-2 text-sm">
+                Open dashboard <ArrowRight size={15} />
               </button>
             </div>
           ) : (
             <>
-              {error && <p className="text-red-400 text-sm mb-3">{error}</p>}
-              <button
-                onClick={becomeProvider}
-                disabled={becoming}
-                className="flex items-center gap-2 bg-amber-400 hover:bg-amber-300 disabled:opacity-60 text-zinc-950 font-semibold text-sm px-5 py-2.5 rounded-xl transition-colors"
-              >
-                {becoming ? <><Loader size={14} className="animate-spin" /> Creating listing…</> : <><Briefcase size={14} /> Become a provider</>}
+              {error && <p className="relative text-coral text-sm mb-3 bg-coral-tint rounded-xl px-3 py-2">{error}</p>}
+              <button onClick={becomeProvider} disabled={becoming} className="relative btn-agave px-5 py-3 text-sm">
+                {becoming ? <><Loader size={15} className="animate-spin" /> Creating your listing…</> : <><Store size={16} /> List my business — free</>}
               </button>
             </>
           )}
         </div>
+
+        <div className="flex justify-center mt-8 opacity-60"><Logo size={22} /></div>
       </div>
     </div>
   );

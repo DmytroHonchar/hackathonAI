@@ -3,40 +3,38 @@ import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import type { Booking, Provider } from '../lib/types';
-import { Calendar, MapPin } from 'lucide-react';
+import { Calendar, MapPin, ChevronRight, CalendarCheck, Sparkles } from 'lucide-react';
+import { categoryMeta } from '../lib/categories';
 
 type FullBooking = Booking & { provider: Provider };
-
 type BookingStatus = Booking['status'];
 
 const STATUS_STYLES: Record<BookingStatus, string> = {
-  pending:     'bg-zinc-800 text-zinc-300',
-  accepted:    'bg-blue-900/40 text-blue-400',
-  on_the_way:  'bg-yellow-900/40 text-yellow-400',
-  in_progress: 'bg-amber-900/40 text-amber-400',
-  completed:   'bg-emerald-900/40 text-emerald-400',
-  cancelled:   'bg-red-900/40 text-red-400',
+  pending:     'bg-sand text-ink-soft',
+  accepted:    'bg-agave-tint text-agave-dark',
+  on_the_way:  'bg-marigold-tint text-[#9a6d12]',
+  in_progress: 'bg-clay-tint text-clay-dark',
+  completed:   'bg-agave text-white',
+  cancelled:   'bg-coral-tint text-coral',
 };
 
 const STATUS_LABELS: Record<BookingStatus, string> = {
-  pending:     'Pending',
-  accepted:    'Accepted',
-  on_the_way:  'On the way',
-  in_progress: 'In progress',
-  completed:   'Completed',
-  cancelled:   'Cancelled',
+  pending: 'Pending', accepted: 'Accepted', on_the_way: 'On the way',
+  in_progress: 'In progress', completed: 'Completed', cancelled: 'Cancelled',
 };
+
+const ACTIVE: BookingStatus[] = ['pending', 'accepted', 'on_the_way', 'in_progress'];
 
 export default function Bookings() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [bookings, setBookings] = useState<FullBooking[]>([]);
   const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<'active' | 'past'>('active');
 
   useEffect(() => {
     if (authLoading) return;
     if (!user) { navigate('/login'); return; }
-
     supabase
       .from('bookings')
       .select('*, provider:providers(id, name, category, photo_url, price_from, rating, review_count, emergency, available, lat, lng, city, languages, description, created_at)')
@@ -49,60 +47,84 @@ export default function Bookings() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-amber-400/30 border-t-amber-400 rounded-full animate-spin" />
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-8 h-8 border-[3px] border-clay/25 border-t-clay rounded-full animate-spin" />
       </div>
     );
   }
 
+  const active = bookings.filter((b) => ACTIVE.includes(b.status));
+  const past = bookings.filter((b) => !ACTIVE.includes(b.status));
+  const list = tab === 'active' ? active : past;
+
   return (
-    <div className="min-h-screen bg-zinc-950">
+    <div className="min-h-screen">
       <div className="max-w-3xl mx-auto px-4 py-8">
-        <h1 className="text-white text-2xl font-bold mb-6">Your bookings</h1>
+        <h1 className="font-display text-3xl font-semibold text-ink mb-1">Your bookings</h1>
+        <p className="text-ink-soft text-sm mb-6">Track jobs and chat with your pros.</p>
 
         {bookings.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <p className="text-zinc-400 font-medium mb-2">No bookings yet</p>
-            <p className="text-zinc-600 text-sm mb-6">Head to the concierge to find and book a pro.</p>
-            <Link to="/app" className="bg-amber-400 hover:bg-amber-300 text-zinc-950 font-semibold text-sm px-5 py-2.5 rounded-xl transition-colors">
-              Open concierge
-            </Link>
+          <div className="card rounded-4xl flex flex-col items-center justify-center py-16 px-6 text-center">
+            <div className="w-16 h-16 rounded-3xl bg-clay-tint grid place-items-center mb-4"><CalendarCheck size={28} className="text-clay" /></div>
+            <p className="font-display text-xl font-semibold text-ink mb-1">No bookings yet</p>
+            <p className="text-ink-soft text-sm mb-6 max-w-xs">When you book a pro it’ll show up here. Ready to find someone?</p>
+            <div className="flex gap-2">
+              <Link to="/browse" className="btn-ghost px-5 py-2.5 text-sm">Explore pros</Link>
+              <Link to="/app" className="btn-clay px-5 py-2.5 text-sm"><Sparkles size={15} /> Ask assistant</Link>
+            </div>
           </div>
         ) : (
-          <div className="flex flex-col gap-3">
-            {bookings.map((b) => (
-              <Link
-                key={b.id}
-                to={`/bookings/${b.id}`}
-                className="bg-zinc-900 border border-zinc-800 hover:border-zinc-700 rounded-2xl p-4 flex gap-4 items-start transition-colors"
-              >
-                <img
-                  src={b.provider?.photo_url ?? `https://i.pravatar.cc/150?u=${b.provider_id}`}
-                  alt={b.provider?.name}
-                  className="w-12 h-12 rounded-xl object-cover bg-zinc-800 flex-shrink-0"
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-2">
-                    <h3 className="text-white font-semibold text-sm">{b.provider?.name}</h3>
-                    <span className={`flex-shrink-0 text-xs px-2.5 py-0.5 rounded-full font-medium ${STATUS_STYLES[b.status]}`}>
-                      {STATUS_LABELS[b.status]}
-                    </span>
-                  </div>
-                  <p className="text-zinc-500 text-xs capitalize mt-0.5">{b.provider?.category}</p>
-                  <div className="flex items-center gap-3 mt-1.5 text-xs text-zinc-500">
-                    <span className="flex items-center gap-1">
-                      <Calendar size={11} />
-                      {new Date(b.scheduled_for).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })}
-                    </span>
-                    <span className="flex items-center gap-1 truncate">
-                      <MapPin size={11} />
-                      <span className="truncate">{b.address}</span>
-                    </span>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
+          <>
+            {/* Tabs */}
+            <div className="inline-flex bg-sand rounded-full p-1 mb-5">
+              {(['active', 'past'] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setTab(t)}
+                  className={`px-5 py-2 rounded-full text-sm font-semibold transition-all capitalize ${
+                    tab === t ? 'bg-surface text-ink shadow-soft' : 'text-ink-soft hover:text-ink'
+                  }`}
+                >
+                  {t} {t === 'active' ? `(${active.length})` : `(${past.length})`}
+                </button>
+              ))}
+            </div>
+
+            {list.length === 0 ? (
+              <div className="text-center py-14 text-ink-soft text-sm">Nothing {tab} right now.</div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {list.map((b) => {
+                  const cat = categoryMeta(b.provider?.category ?? '');
+                  return (
+                    <Link
+                      key={b.id}
+                      to={`/bookings/${b.id}`}
+                      className="group card rounded-3xl p-4 flex gap-4 items-center hover:shadow-card hover:-translate-y-0.5 transition-all"
+                    >
+                      <img
+                        src={b.provider?.photo_url ?? `https://i.pravatar.cc/120?u=${b.provider_id}`}
+                        alt={b.provider?.name}
+                        className="w-14 h-14 rounded-2xl object-cover bg-sand flex-shrink-0"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <h3 className="text-ink font-semibold text-[15px] truncate">{b.provider?.name}</h3>
+                          <span className={`chip flex-shrink-0 ${STATUS_STYLES[b.status]}`}>{STATUS_LABELS[b.status]}</span>
+                        </div>
+                        <p className={`text-xs font-semibold mt-0.5 ${cat.tintText}`}>{cat.label}</p>
+                        <div className="flex items-center gap-3 mt-1.5 text-xs text-ink-soft">
+                          <span className="flex items-center gap-1"><Calendar size={12} className="text-ink-faint" />{new Date(b.scheduled_for).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                          <span className="flex items-center gap-1 truncate"><MapPin size={12} className="text-ink-faint" /><span className="truncate">{b.address}</span></span>
+                        </div>
+                      </div>
+                      <ChevronRight size={18} className="text-ink-faint group-hover:text-clay group-hover:translate-x-0.5 transition-all flex-shrink-0" />
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

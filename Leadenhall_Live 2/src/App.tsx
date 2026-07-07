@@ -16,7 +16,10 @@ function WithNav() {
   return (
     <>
       <Nav />
-      <Outlet />
+      {/* pad for the mobile bottom tab bar */}
+      <div className="pb-16 md:pb-0">
+        <Outlet />
+      </div>
     </>
   );
 }
