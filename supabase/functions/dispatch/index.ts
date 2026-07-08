@@ -20,7 +20,7 @@ const TOOLS = [
         type: "object",
         properties: {
           natural_query: { type: "string" },
-          category: { type: "string", enum: ["plumber", "electrician", "cleaner"] },
+          category: { type: "string", description: "One of: plumber, electrician, cleaner" },
           max_price: { type: "number" },
           emergency: { type: "boolean" },
         },
