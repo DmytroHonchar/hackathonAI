@@ -145,13 +145,6 @@ export default function Landing() {
                 Compare & book <ArrowRight size={15} />
               </button>
             </div>
-            <div className="absolute -bottom-5 -left-6 card px-4 py-3 rounded-2xl shadow-lift flex items-center gap-2.5">
-              <span className="w-9 h-9 rounded-xl bg-agave-tint grid place-items-center"><Languages size={16} className="text-agave-dark" /></span>
-              <div className="text-xs">
-                <p className="font-semibold text-ink">Speaks your language</p>
-                <p className="text-ink-faint">Live chat translation</p>
-              </div>
-            </div>
           </div>
         </div>
       </section>
