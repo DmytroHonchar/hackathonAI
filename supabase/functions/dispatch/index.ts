@@ -7,8 +7,11 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-// Kept short intentionally — every token here is paid per API call
-const SYSTEM_PROMPT = `You are Dispatch, a concierge for home services (plumbers, electricians, cleaners). You serve any location — use the provider's city and distance to give accurate location info. Rules: (1) Always call search_providers first — never invent providers. (2) Show 2–3 options max with a one-line reason each. (3) Before create_booking you need a time, address, and confirmed provider — ask for one missing item at a time. (4) After booking, confirm details and mention the Bookings page. (5) Reply in the user's language. (6) If no results, say so and offer to widen filters. (7) Never assume or state a provider is in a specific city unless their data explicitly says so. Be concise.`;
+const MODEL = "llama-3.3-70b-versatile";
+
+const SYSTEM_PROMPT = `You are Dispatch, a concierge for home services (plumbers, electricians, cleaners). You serve any location — use the provider's city and distance to give accurate location info. Rules: (1) Always call search_providers first — never invent providers. (2) Show 2–3 options max with a one-line reason each. (3) Before create_booking you need a time, address, and confirmed provider — ask for one missing item at a time. (4) After booking, confirm details and mention the Bookings page. (5) Reply in the user's language. (6) If no results, say so and offer to widen filters. (7) Never assume or state a provider is in a specific city unless their data explicitly says so. Be concise. Do not output raw JSON or code blocks in your replies.`;
+
+const TOOL_CALL_REMINDER = "IMPORTANT: When invoking a tool, the arguments field must contain only a valid JSON object with no extra text or fields beyond those defined in the tool schema.";
 
 const TOOLS = [
   {
@@ -19,10 +22,10 @@ const TOOLS = [
       parameters: {
         type: "object",
         properties: {
-          natural_query: { type: "string" },
-          category: { type: "string", description: "One of: plumber, electrician, cleaner" },
-          max_price: { type: "number" },
-          emergency: { type: "boolean" },
+          natural_query: { type: "string", description: "Plain-text description of what the user needs" },
+          category: { type: "string", description: "Service category: plumber, electrician, or cleaner" },
+          max_price: { type: "number", description: "Maximum hourly price the user is willing to pay" },
+          emergency: { type: "boolean", description: "Set true only if the user explicitly needs emergency service" },
         },
         required: ["natural_query"],
       },
@@ -32,10 +35,12 @@ const TOOLS = [
     type: "function",
     function: {
       name: "get_provider",
-      description: "Get details for a specific provider by ID.",
+      description: "Get full details for a specific provider by ID.",
       parameters: {
         type: "object",
-        properties: { provider_id: { type: "string" } },
+        properties: {
+          provider_id: { type: "string", description: "UUID of the provider" },
+        },
         required: ["provider_id"],
       },
     },
@@ -44,14 +49,14 @@ const TOOLS = [
     type: "function",
     function: {
       name: "create_booking",
-      description: "Create a booking. Needs confirmed provider, ISO datetime, and address.",
+      description: "Create a booking. Requires a confirmed provider, an ISO-8601 datetime, and a service address.",
       parameters: {
         type: "object",
         properties: {
-          provider_id: { type: "string" },
-          scheduled_for: { type: "string" },
-          address: { type: "string" },
-          notes: { type: "string" },
+          provider_id: { type: "string", description: "UUID of the chosen provider" },
+          scheduled_for: { type: "string", description: "ISO-8601 datetime string" },
+          address: { type: "string", description: "Full service address" },
+          notes: { type: "string", description: "Optional additional notes for the provider" },
         },
         required: ["provider_id", "scheduled_for", "address"],
       },
@@ -61,17 +66,18 @@ const TOOLS = [
     type: "function",
     function: {
       name: "get_booking_status",
-      description: "Get the status of a booking.",
+      description: "Get the current status of an existing booking.",
       parameters: {
         type: "object",
-        properties: { booking_id: { type: "string" } },
+        properties: {
+          booking_id: { type: "string", description: "UUID of the booking" },
+        },
         required: ["booking_id"],
       },
     },
   },
 ];
 
-// Fields surfaced to the UI (full display data)
 interface ProviderResult {
   id: string;
   name: string;
@@ -117,7 +123,6 @@ interface GroqMessage {
   name?: string;
 }
 
-// Compact provider shape sent to the model — no embedding, no photo, no coords
 function toModelProvider(p: ProviderResult & { score?: number; city?: string }) {
   return {
     id: p.id,
@@ -134,13 +139,18 @@ function toModelProvider(p: ProviderResult & { score?: number; city?: string }) 
   };
 }
 
-// Groq API call with retry on 429
 async function callGroq(
   messages: GroqMessage[],
-  attempt = 0
+  opts: { attempt?: number; extraSystemNote?: string } = {}
 ): Promise<{ ok: boolean; status: number; body: unknown; retries: number }> {
+  const { attempt = 0, extraSystemNote } = opts;
   const start = Date.now();
-  const MODEL = "llama-3.3-70b-versatile";
+
+  const finalMessages = extraSystemNote
+    ? messages.map((m, i) =>
+        i === 0 ? { ...m, content: (m.content ?? "") + "\n\n" + extraSystemNote } : m
+      )
+    : messages;
 
   const resp = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
@@ -151,29 +161,37 @@ async function callGroq(
     body: JSON.stringify({
       model: MODEL,
       max_tokens: 800,
+      temperature: 0.2,
       tools: TOOLS,
       tool_choice: "auto",
-      messages,
+      messages: finalMessages,
     }),
   });
 
   const duration = Date.now() - start;
-
-  if (resp.status === 429 && attempt < 2) {
-    const retryAfterSec = parseInt(resp.headers.get("retry-after") ?? "12", 10);
-    const waitMs = Math.min(retryAfterSec * 1000, 20_000);
-    console.log(`[dispatch] 429 on attempt ${attempt + 1}, waiting ${waitMs}ms (retry-after: ${retryAfterSec}s)`);
-    await new Promise((r) => setTimeout(r, waitMs));
-    return callGroq(messages, attempt + 1);
-  }
-
   const body = await resp.json();
+
   const usage = (body as { usage?: { prompt_tokens: number; completion_tokens: number } }).usage;
   console.log(
     `[dispatch] model=${MODEL} attempt=${attempt + 1} status=${resp.status} ` +
     `prompt_tokens=${usage?.prompt_tokens ?? "?"} completion_tokens=${usage?.completion_tokens ?? "?"} ` +
     `duration=${duration}ms`
   );
+
+  if (!resp.ok) {
+    // Log the full error body so failed_generation is visible in edge function logs
+    console.error(`[dispatch] Groq error ${resp.status} full body:`, JSON.stringify(body));
+    const fg = (body as { error?: { failed_generation?: string } }).error?.failed_generation;
+    if (fg) console.error("[dispatch] failed_generation:", fg);
+  }
+
+  if (resp.status === 429 && attempt < 2) {
+    const retryAfterSec = parseInt(resp.headers.get("retry-after") ?? "12", 10);
+    const waitMs = Math.min(retryAfterSec * 1000, 20_000);
+    console.log(`[dispatch] 429 on attempt ${attempt + 1}, waiting ${waitMs}ms`);
+    await new Promise((r) => setTimeout(r, waitMs));
+    return callGroq(messages, { attempt: attempt + 1, extraSystemNote });
+  }
 
   return { ok: resp.ok, status: resp.status, body, retries: attempt };
 }
@@ -228,12 +246,21 @@ Deno.serve(async (req: Request) => {
           emergency?: boolean;
         };
 
+        // Normalise category in case the model uses wrong casing
+        const normCategory = typeof category === "string"
+          ? category.toLowerCase().trim()
+          : undefined;
+        const validCategories = ["plumber", "electrician", "cleaner"];
+        const safeCategory = normCategory && validCategories.includes(normCategory)
+          ? normCategory
+          : null;
+
         const embedding = await session.run(natural_query, { mean_pool: true, normalize: true });
 
         const { data: semanticData, error: semanticError } = await supabaseService.rpc("match_providers", {
           query_embedding: embedding,
           match_count: 10,
-          filter_category: category ?? null,
+          filter_category: safeCategory,
           user_lat: userLat,
           user_lng: userLng,
         });
@@ -242,14 +269,15 @@ Deno.serve(async (req: Request) => {
 
         let results = semanticData ?? [];
         if (results.length === 0) {
-          const { data: fallback } = await supabaseService.rpc("search_providers", {
-            filter_category: category ?? null,
+          const { data: fallback, error: fallbackError } = await supabaseService.rpc("search_providers", {
+            filter_category: safeCategory,
             max_price: null,
             only_emergency: emergency ?? false,
             user_lat: userLat,
             user_lng: userLng,
             max_distance_km: 500,
           });
+          if (fallbackError) console.error("[dispatch] search_providers fallback error:", fallbackError.message);
           results = fallback ?? [];
         }
 
@@ -257,7 +285,6 @@ Deno.serve(async (req: Request) => {
         if (emergency) results = results.filter((p: { emergency: boolean }) => p.emergency);
         const top5 = results.slice(0, 5);
 
-        // Full data for the UI panel (photo, coords, etc.)
         ui.providers = top5.map((p: ProviderResult & { score?: number }) => ({
           id: p.id,
           name: p.name,
@@ -275,13 +302,11 @@ Deno.serve(async (req: Request) => {
           emergency: p.emergency,
         }));
 
-        // Compact version for the model — strips embedding, photo, coords, truncates desc
         return top5.map(toModelProvider);
       }
 
       if (name === "get_provider") {
         const { provider_id } = input as { provider_id: string };
-        // Explicit column list — NEVER select * (would include embedding vector)
         const { data, error } = await supabaseService
           .from("providers")
           .select("id, name, category, description, city, lat, lng, price_from, rating, review_count, emergency, languages")
@@ -348,7 +373,6 @@ Deno.serve(async (req: Request) => {
       throw new Error(`Unknown tool: ${name}`);
     }
 
-    // Limit history to last 6 messages to cap input tokens
     const recentMessages = (messages as Array<{ role: string; content: string }>).slice(-6);
 
     const groqMessages: GroqMessage[] = [
@@ -363,15 +387,32 @@ Deno.serve(async (req: Request) => {
     const MAX_ITERATIONS = 6;
 
     for (let i = 0; i < MAX_ITERATIONS; i++) {
-      const { ok, status, body, retries } = await callGroq(groqMessages);
+      let { ok, status, body, retries } = await callGroq(groqMessages);
+
+      // On 400 failed_generation, retry once with an explicit reminder
+      if (!ok && status === 400) {
+        const errBody = body as { error?: { message?: string; failed_generation?: string } };
+        const isToolCallFailure = errBody.error?.message?.includes("Failed to call a function") ||
+                                   errBody.error?.failed_generation !== undefined;
+
+        if (isToolCallFailure) {
+          console.warn("[dispatch] tool call failure — retrying with reminder");
+          const retry = await callGroq(groqMessages, { extraSystemNote: TOOL_CALL_REMINDER });
+          ok = retry.ok;
+          status = retry.status;
+          body = retry.body;
+          retries = retry.retries;
+        }
+      }
 
       if (!ok) {
         if (status === 429) {
           finalReply = "The AI assistant is temporarily busy — please try again in a moment.";
-          break;
+        } else {
+          console.error(`[dispatch] unrecoverable Groq error ${status}`);
+          finalReply = "I'm having trouble connecting right now. Please try again in a moment.";
         }
-        const errMsg = (body as { error?: { message?: string } }).error?.message ?? JSON.stringify(body);
-        throw new Error(`Groq API error ${status}: ${errMsg}`);
+        break;
       }
 
       if (retries > 0) {
@@ -389,7 +430,10 @@ Deno.serve(async (req: Request) => {
       };
 
       const choice = result.choices?.[0];
-      if (!choice) throw new Error("Empty response from Groq");
+      if (!choice) {
+        finalReply = "I received an unexpected response. Please try again.";
+        break;
+      }
 
       const assistantMsg = choice.message;
 
@@ -406,6 +450,7 @@ Deno.serve(async (req: Request) => {
             const input = JSON.parse(tc.function.arguments);
             toolOutput = await executeTool(tc.function.name, input);
           } catch (err) {
+            console.error(`[dispatch] tool ${tc.function.name} error:`, (err as Error).message);
             toolOutput = { error: (err as Error).message };
           }
           groqMessages.push({
@@ -426,7 +471,6 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Persist conversation
     const lastUserMessage = recentMessages.findLast((m) => m.role === "user");
     if (lastUserMessage) {
       await supabaseUser.from("conversations").insert([
