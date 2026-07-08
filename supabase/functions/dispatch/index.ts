@@ -140,8 +140,7 @@ async function callGroq(
   attempt = 0
 ): Promise<{ ok: boolean; status: number; body: unknown; retries: number }> {
   const start = Date.now();
-  // openai/gpt-oss-120b: 250K TPM (vs 8K for qwen/qwen3.6-27b), no thinking tokens, reliable tool use
-  const MODEL = "openai/gpt-oss-120b";
+  const MODEL = "llama-3.3-70b-versatile";
 
   const resp = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
@@ -394,7 +393,7 @@ Deno.serve(async (req: Request) => {
 
       const assistantMsg = choice.message;
 
-      if (choice.finish_reason === "tool_calls" && assistantMsg.tool_calls?.length) {
+      if (assistantMsg.tool_calls?.length) {
         groqMessages.push({
           role: "assistant",
           content: assistantMsg.content ?? null,
